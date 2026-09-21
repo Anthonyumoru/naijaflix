@@ -1,4 +1,4 @@
- * sw.js — NaijaFlix Service Worker with Encrypted Offline Video Caching
+ *  sw.js -NaijaFlix Service Worker with Encrypted Offline Video Caching
  *
  * Features:
  *  - App shell caching (same as before)
