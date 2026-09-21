@@ -4,6 +4,7 @@ import CastButton from './components/CastButton';
 import Settings from './components/Settings';
 import axios from 'axios';
 import Help from './components/Help';
+import { downloadVideo, isVideoCached, deleteCachedVideo } from "./offline-video";
 const API_URL = import.meta.env.VITE_API_URL || "https://moviebox-backend.umoruanthony345.workers.dev";
 const TIPS_API = "https://naijaflix-tips.umoruanthony345.workers.dev";
 const STREAM_URL = "https://moviebox-stream.umoruanthony345.workers.dev/video?url=";
@@ -502,21 +503,16 @@ function App() {
   };
 
   const handleDownload = async (movie) => {
-    try {
-      const res = await fetch(`${STREAM_URL}${encodeURIComponent(movie.videoUrl)}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${movie.title}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      window.open(`${STREAM_URL}${encodeURIComponent(movie.videoUrl)}`, "_blank");
-    }
-  };
+  try {
+    alert("📥 Downloading for offline... You'll be notified when ready.");
+    await downloadVideo(movie.videoUrl, movie.title, {
+      onProgress: (p) => console.log(`Download: ${Math.round(p * 100)}%`),
+    });
+    alert("✅ Downloaded! You can now watch this movie offline.");
+  } catch (err) {
+    alert("❌ Download failed: " + err.message);
+  }
+};
 
   const toggleLike = async (movieId) => {
     if (!user) return alert("Please login to like");
