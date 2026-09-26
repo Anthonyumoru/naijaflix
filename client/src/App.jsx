@@ -1163,7 +1163,7 @@ function App() {
             </div>
             <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", background: "#000", borderRadius: "12px", overflow: "hidden" }}>
               <iframe
-                src="https://customer-pg1x47f0xvj6x2nq.cloudflarestream.com/da664d4df1cbca2577c2e1d5c3b0d6e2/iframe"
+                src="https://customer-pg1x47f0xvj6x2nq.cloudflarestream.com/9bb932801d0107012c9386c8a462b6a7/iframe"
                 allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
                 allowfullscreen="true"
                 style={{ width: "100%", height: "100%", border: "none" }}
@@ -1194,8 +1194,8 @@ function App() {
                 <div style={{ marginBottom: "12px" }}>
                   <p style={{ fontSize: "13px", color: "#888", marginBottom: "4px" }}>Stream Key</p>
                   <div style={{ display: "flex", gap: "8px" }}>
-                    <input type="text" value="0af22910321f1056c83412b5e1ce8a7akda664d4df1cbca2577c2e1d5c3b0d6e2" readOnly style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: "10px", borderRadius: "6px", fontFamily: "monospace" }} />
-                    <button onClick={() => { navigator.clipboard.writeText("0af22910321f1056c83412b5e1ce8a7akda664d4df1cbca2577c2e1d5c3b0d6e2"); alert("Copied!"); }} style={{ padding: "10px 14px", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "6px", cursor: "pointer" }}>Copy</button>
+                    <input type="text" value="f382843e655c02886057a24ad720ed15k9bb932801d0107012c9386c8a462b6a7" readOnly style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: "10px", borderRadius: "6px", fontFamily: "monospace" }} />
+                    <button onClick={() => { navigator.clipboard.writeText("f382843e655c02886057a24ad720ed15k9bb932801d0107012c9386c8a462b6a7"); alert("Copied!"); }} style={{ padding: "10px 14px", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "6px", cursor: "pointer" }}>Copy</button>
                   </div>
                 </div>
                 <div style={{ fontSize: "13px", color: "#888", lineHeight: 1.6, padding: "12px", background: "var(--bg)", borderRadius: "8px" }}>
