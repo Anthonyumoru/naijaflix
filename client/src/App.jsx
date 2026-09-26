@@ -9,7 +9,7 @@ const API_URL = import.meta.env.VITE_API_URL || "https://moviebox-backend.umorua
 const TIPS_API = "https://naijaflix-tips.umoruanthony345.workers.dev";
 const STREAM_URL = "https://moviebox-stream.umoruanthony345.workers.dev/video?url=";
 const AUTH_API = "https://auth.naijaflix.site";
-const LIVE_API = "https://naijaflix-live.umoruanthony345.workers.dev";
+const LIVE_API = "https://live.naijaflix.site";
 
 // Get token from localStorage (works in both browser and APK)
 const getToken = () => localStorage.getItem("naijaflix_token");
