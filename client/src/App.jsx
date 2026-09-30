@@ -10,7 +10,7 @@ const TIPS_API = "https://naijaflix-tips.umoruanthony345.workers.dev";
 const STREAM_URL = "https://moviebox-stream.umoruanthony345.workers.dev/video?url=";
 const AUTH_API = "https://auth.naijaflix.site";
 const LIVE_API = "https://live.naijaflix.site";
-
+const PRIVACY_URL = "https://privacy.naijaflix.site";
 const WHIP_URL = "https://customer-pg1x47f0xvj6x2nq.cloudflarestream.com/51534f84262cf67b632d98eef6f59156k991c73f531564f40e85c1eac9349b3bf/webRTC/publish";
 const WHEP_URL = "https://customer-pg1x47f0xvj6x2nq.cloudflarestream.com/991c73f531564f40e85c1eac9349b3bf/webRTC/play";
 
