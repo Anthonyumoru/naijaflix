@@ -13,7 +13,7 @@ const LIVE_API = "https://live.naijaflix.site";
 const PRIVACY_URL = "https://privacy.naijaflix.site";
 const WHIP_URL = "https://customer-pg1x47f0xvj6x2nq.cloudflarestream.com/51534f84262cf67b632d98eef6f59156k991c73f531564f40e85c1eac9349b3bf/webRTC/publish";
 const WHEP_URL = "https://customer-pg1x47f0xvj6x2nq.cloudflarestream.com/991c73f531564f40e85c1eac9349b3bf/webRTC/play";
-const CHAT_WS = "wss://naijaflix-chat.umoruanthony345.workers.dev";
+const CHAT_WS = "wss://chat.naijaflix.site";
 
 const getToken = () => localStorage.getItem("naijaflix_token");
 
