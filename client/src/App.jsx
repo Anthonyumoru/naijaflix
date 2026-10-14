@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import R2Uploader from './components/R2Uploader';
 import CastButton from './components/CastButton';
 import Settings from './components/Settings';
