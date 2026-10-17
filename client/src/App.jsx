@@ -12,7 +12,7 @@ const STREAM_URL = "https://moviebox-stream.umoruanthony345.workers.dev/video?ur
 const AUTH_API = "https://auth.naijaflix.site";
 const LIVE_API = "https://live.naijaflix.site";
 const PRIVACY_URL = "https://privacy.naijaflix.site";
-
+const TRENDING_API = "https://trending.naijaflix.site";
 // ⚠️ SECURITY: These tokens should be fetched from a backend endpoint after authentication,
 // not hardcoded in client-side code. Anyone viewing page source can hijack your stream.
 // Move these to a Workers API that returns them only to authenticated users.
@@ -670,7 +670,7 @@ function App() {
   // 🔥 TRENDING - Fetch trending movies after movies are loaded
   useEffect(() => {
     if (movies.length === 0) return;
-    fetch(`${TIPS_API}/trending`)
+    fetch(`${TRENDING_API}/trending`)
       .then(res => res.json())
       .then(data => {
         if (data.trending && Array.isArray(data.trending)) {
