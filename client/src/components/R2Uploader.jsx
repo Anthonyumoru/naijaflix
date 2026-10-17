@@ -234,7 +234,7 @@ export default function R2Uploader({ onUpload }) {
         <option>Church Program</option>
         <option>Comedy</option>
         <option>Music Video</option>
-        <option>Snapchat</option>
+        <option>Shorts</option>
         <option>Drama</option>
       </select>
 
