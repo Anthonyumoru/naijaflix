@@ -967,7 +967,7 @@ function App() {
 
   // #22 - Memoize filtered movies
   const filtered = useMemo(() => movies.filter(m => {
-    if (appSettings.familyMode && (m.category === 'Snapchat' || m.category === 'Drama')) return false;
+    if (appSettings.familyMode && (m.category === 'Shorts' || m.category === 'Drama')) return false;
     const matchSearch = (m.title && m.title.toLowerCase().includes(search.toLowerCase())) || (m.description && m.description.toLowerCase().includes(search.toLowerCase()));
     const matchCat = category === "All" || m.category === category;
     const moodCats = mood ? moods.find(mo => mo.label === mood)?.cats : null;
