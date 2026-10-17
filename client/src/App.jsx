@@ -131,7 +131,7 @@ function App() {
   const heartbeatRef = useRef(null);
   const lastReceivedRef = useRef(Date.now());
 
-  const categories = ["All", "Nollywood", "Church Program", "Comedy", "Music Video", "Snapchat", "Drama", "Action", "Uncategorized"];
+  const categories = ["All", "Nollywood", "Church Program", "Comedy", "Music Video", "Shorts", "Drama", "Action", "coming soon"];
 
   const moods = [
     { emoji: "😂", label: "Laugh", cats: ["Comedy"] },
@@ -139,7 +139,7 @@ function App() {
     { emoji: "😢", label: "Emotional", cats: ["Drama"] },
     { emoji: "🎤", label: "Vibes", cats: ["Music Video"] },
     { emoji: "🔥", label: "Thrill", cats: ["Action", "Drama"] },
-    { emoji: "📱", label: "Quick", cats: ["Snapchat"] },
+    { emoji: "📱", label: "Quick", cats: ["Shorts"] },
   ];
 
   // #18 - Auth check with 401/expiry handling
