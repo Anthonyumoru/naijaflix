@@ -980,7 +980,7 @@ function App() {
     const result = {};
     if (category === "All" && !search && !mood) {
       categories.slice(1).forEach(cat => {
-        if (appSettings.familyMode && (cat === 'Snapchat' || cat === 'Drama')) return;
+        if (appSettings.familyMode && (cat === 'Shorts' || cat === 'Drama')) return;
         const catMovies = movies.filter(m => m.category === cat && m.approved === 1);
         if (catMovies.length > 0) result[cat] = catMovies;
       });
