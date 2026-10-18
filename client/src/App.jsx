@@ -747,7 +747,7 @@ function App() {
 
   const trackView = async (movieId) => {
     try {
-      await fetch(`${TIPS_API}/track-view`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ movieId }) });
+      await fetch(`${TRENDING_API}/track-view`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ movieId }) });
     } catch (err) { console.error("View tracking error:", err); }
   };
 
