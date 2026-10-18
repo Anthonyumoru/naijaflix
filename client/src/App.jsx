@@ -8,11 +8,12 @@ import { downloadVideo, isVideoCached, deleteCachedVideo } from "./offline-video
 
 const API_URL = import.meta.env.VITE_API_URL || "https://moviebox-backend.umoruanthony345.workers.dev";
 const TIPS_API = "https://naijaflix-tips.umoruanthony345.workers.dev";
+const TRENDING_API = "https://trending.naijaflix.site";
 const STREAM_URL = "https://moviebox-stream.umoruanthony345.workers.dev/video?url=";
 const AUTH_API = "https://auth.naijaflix.site";
 const LIVE_API = "https://live.naijaflix.site";
 const PRIVACY_URL = "https://privacy.naijaflix.site";
-const TRENDING_API = "https://trending.naijaflix.site";
+
 // ⚠️ SECURITY: These tokens should be fetched from a backend endpoint after authentication,
 // not hardcoded in client-side code. Anyone viewing page source can hijack your stream.
 // Move these to a Workers API that returns them only to authenticated users.
