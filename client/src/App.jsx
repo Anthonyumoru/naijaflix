@@ -1076,7 +1076,7 @@ function App() {
             <button onClick={handleAuth} style={{ width: "100%", padding: "12px", background: "var(--red)", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600", marginBottom: "12px" }}>{authMode === "login" ? "Login" : "Create Account"}</button>
             <p style={{ textAlign: "center", fontSize: "14px", color: "#888" }}>
               {authMode === "login" ? (
-                <>Don't have an account? <span style={{ color: "var(--red)", cursor: "pointer" }} onClick={() => setAuthMode("signup")}>Sign Up</span>
+                <>Don't have an account? <span style={{ color: "var(--red)", cursor: "pointer" }} onClick={() => setAuthMode("signup")}>Sign Up</span></>
               ) : (
                 <>Already have an account? <span style={{ color: "var(--red)", cursor: "pointer" }} onClick={() => setAuthMode("login")}>Login</span></>
               )}
