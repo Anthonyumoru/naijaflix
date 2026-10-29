@@ -12,6 +12,7 @@ const STREAM_URL = "https://moviebox-stream.umoruanthony345.workers.dev/video?ur
 const AUTH_API = "https://auth.naijaflix.site";
 const LIVE_API = "https://live.naijaflix.site";
 const PRIVACY_URL = "https://privacy.naijaflix.site";
+const FORGET_PASSWORD_API = "https://forget-password.umoruanthony345.workers.dev";
 
 // ⚠️ SECURITY: These tokens should be fetched from a backend endpoint after authentication,
 // not hardcoded in client-side code. Anyone viewing page source can hijack your stream.
