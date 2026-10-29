@@ -536,10 +536,6 @@ function App() {
         body: JSON.stringify({ username: authUsername, password: authPassword })
       });
       authMode === "login" && (
-  <p style={{ textAlign: "center", fontSize: "14px", marginTop: "8px" }}>
-    <span style={{ color: "#1DA1F2", cursor: "pointer" }} onClick={() => { setShowAuth(false); setShowForgotPassword(true); }}>🔑 Forgot Password?</span>
-  </p>
-)}
       const data = await res.json();
       if (data.error) return alert("❌ " + data.error);
       localStorage.setItem("naijaflix_token", data.token);
