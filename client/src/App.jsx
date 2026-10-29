@@ -549,6 +549,34 @@ function App() {
       alert("❌ Failed to connect to auth server");
     }
   };
+  const handleForgotPassword = async () => {
+  if (!forgotUsername.trim() && !forgotEmail.trim()) {
+    return alert("Please enter your username or email");
+  }
+  setForgotLoading(true);
+  try {
+    const res = await fetch(`${FORGET_PASSWORD_API}/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: forgotUsername.trim() || undefined,
+        email: forgotEmail.trim() || undefined
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert("✅ Password reset link sent! Check your email.");
+      setShowForgotPassword(false);
+      setForgotEmail("");
+      setForgotUsername("");
+    } else {
+      alert("❌ " + (data.error || "Failed to send reset link"));
+    }
+  } catch (err) {
+    alert("❌ Failed to connect to password reset service");
+  }
+  setForgotLoading(false);
+};
 
   const handleLogout = async () => {
     localStorage.removeItem("naijaflix_token");
