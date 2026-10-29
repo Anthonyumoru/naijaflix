@@ -65,6 +65,10 @@ function App() {
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [profilePic, setProfilePic] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotUsername, setForgotUsername] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   // ⚠️ SECURITY (#13): Admin key in localStorage is trivially bypassable via DevTools.
   // This should be replaced with proper server-side authentication (JWT, session, etc.)
