@@ -14,6 +14,7 @@ const LIVE_API = "https://live.naijaflix.site";
 const PRIVACY_URL = "https://privacy.naijaflix.site";
 const FORGOT_PASSWORD_API = "https://forget-password.umoruanthony345.workers.dev";
 const RESET_PASSWORD_API = "https://reset-password.umoruanthony345.workers.dev";
+const BULK_EMAIL_API = "https://naijaflix-bulk-email.umoruanthony345.workers.dev";
 // ⚠️ SECURITY: These tokens should be fetched from a backend endpoint after authentication,
 // not hardcoded in client-side code. Anyone viewing page source can hijack your stream.
 // Move these to a Workers API that returns them only to authenticated users.
