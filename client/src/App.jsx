@@ -557,28 +557,35 @@ function App() {
   // ==================== END FORGOT PASSWORD ====================
 
   const handleAuth = async () => {
-    if (!authUsername.trim() || !authPassword.trim()) return alert("Please enter username and password");
-    try {
-      const res = await fetch(`${AUTH_API}/${authMode === "login" ? "login" : "signup"}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: authUsername, password: authPassword })
-      });
-      const data = await res.json();
-      if (data.error) return alert("❌ " + data.error);
-      localStorage.setItem("naijaflix_token", data.token);
-      setUser(data.user);
-      if (data.user.profilePic) setProfilePic(data.user.profilePic);
-      if (data.user.creatorId) setCreatorId(data.user.creatorId);
-      setShowAuth(false);
-      setAuthUsername("");
-      setAuthPassword("");
-      if (authMode === "signup") alert("✅ Account created! Welcome to NaijaFlix");
-    } catch (err) {
-      alert("❌ Failed to connect to auth server");
-    }
-  };
+  if (!authUsername.trim() || !authPassword.trim()) return alert("Please enter username and password");
+  if (authMode === "signup" && !authEmail.trim()) return alert("Please enter your email address");
+  try {
+    const payload = authMode === "login"
+      ? { username: authUsername, password: authPassword }
+      : { username: authUsername, email: authEmail, password: authPassword };
 
+    const res = await fetch(`${AUTH_API}/${authMode === "login" ? "login" : "signup"}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (data.error) return alert("❌ " + data.error);
+    localStorage.setItem("naijaflix_token", data.token);
+    setUser(data.user);
+    if (data.user.profilePic) setProfilePic(data.user.profilePic);
+    if (data.user.creatorId) setCreatorId(data.user.creatorId);
+    setShowAuth(false);
+    setAuthUsername("");
+    setAuthEmail("");
+    setAuthPassword("");
+    if (authMode === "signup") alert("✅ Account created! Welcome to NaijaFlix");
+  } catch (err) {
+    alert("❌ Failed to connect to auth server");
+  }
+};
+  
   const handleLogout = async () => {
     localStorage.removeItem("naijaflix_token");
     setUser(null);
