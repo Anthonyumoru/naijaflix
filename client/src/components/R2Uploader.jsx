@@ -1,9 +1,68 @@
+
 import { useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://moviebox-backend.umoruanthony345.workers.dev";
 
 const CHUNK_SIZE = 10 * 1024 * 1024;
 const MULTIPART_THRESHOLD = 100 * 1024 * 1024;
+const MAX_RETRIES = 5;
+const BASE_DELAY = 1000; // 1s, 2s, 4s, 8s, 16s
+
+// ── Sleep helper ──────────────────────────────────────────────
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ── Check if error is network-related (retryable) ────────────
+function isNetworkError(err) {
+  if (!err) return false;
+  const msg = (err.message || "").toLowerCase();
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("network") ||
+    msg.includes("networkerror") ||
+    msg.includes("timeout") ||
+    msg.includes("aborted") ||
+    msg.includes("connection") ||
+    msg.includes("econnreset") ||
+    msg.includes("socket") ||
+    msg.includes("dns") ||
+    msg.includes("offline") ||
+    msg.includes("internet") ||
+    msg.includes("load failed")
+  );
+}
+
+// ── Fetch with auto-retry on network errors ──────────────────
+async function fetchWithRetry(url, options, retries = MAX_RETRIES, onRetry) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+
+      // If we get a 403/401, don't retry — it's an auth issue
+      if (res.status === 401 || res.status === 403) return res;
+
+      // 5xx server errors are also retryable
+      if (res.status >= 500 && attempt < retries) {
+        const delay = BASE_DELAY * Math.pow(2, attempt);
+        if (onRetry) onRetry(attempt + 1, delay, `Server error ${res.status}`);
+        await sleep(delay);
+        continue;
+      }
+
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries && isNetworkError(err)) {
+        const delay = BASE_DELAY * Math.pow(2, attempt);
+        if (onRetry) onRetry(attempt + 1, delay, err.message || "Network error");
+        await sleep(delay);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
 
 async function generateThumbnail(file) {
   return new Promise((resolve, reject) => {
@@ -16,7 +75,6 @@ async function generateThumbnail(file) {
     video.src = url;
 
     video.onloadedmetadata = () => {
-      // Grab frame at 3 seconds; if video is shorter than 3s, use 10% of duration
       video.currentTime = video.duration > 3 ? 3 : video.duration * 0.1;
     };
 
@@ -44,14 +102,16 @@ async function generateThumbnail(file) {
   });
 }
 
-async function uploadSingle(file, onProgress) {
+async function uploadSingle(file, onProgress, onRetry) {
   const adminKey = localStorage.getItem("adminKey") || "";
   const filename = encodeURIComponent(file.name);
   const contentType = encodeURIComponent(file.type || "application/octet-stream");
 
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `${API_URL}/api/upload/single?filename=${filename}&contentType=${contentType}`,
-    { method: "POST", body: file, headers: { "x-admin-key": adminKey } }
+    { method: "POST", body: file, headers: { "x-admin-key": adminKey } },
+    MAX_RETRIES,
+    onRetry
   );
 
   if (!res.ok) {
@@ -64,17 +124,23 @@ async function uploadSingle(file, onProgress) {
   return data.publicUrl;
 }
 
-async function uploadMultipart(file, onProgress) {
+async function uploadMultipart(file, onProgress, onRetry) {
   const adminKey = localStorage.getItem("adminKey") || "";
 
-  const initRes = await fetch(`${API_URL}/api/upload/initiate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
-    body: JSON.stringify({
-      filename: file.name,
-      contentType: file.type || "application/octet-stream",
-    }),
-  });
+  // ── Initiate (with retry) ──────────────────────────────────
+  const initRes = await fetchWithRetry(
+    `${API_URL}/api/upload/initiate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+      }),
+    },
+    MAX_RETRIES,
+    onRetry
+  );
 
   if (!initRes.ok) throw new Error("Failed to initiate upload");
   const { key, uploadId } = await initRes.json();
@@ -83,48 +149,90 @@ async function uploadMultipart(file, onProgress) {
   const parts = [];
   let uploadedBytes = 0;
 
+  // ── Upload each part with per-part retry ──────────────────
   for (let i = 0; i < totalParts; i++) {
     const start = i * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE, file.size);
     const chunk = file.slice(start, end);
     const partNumber = i + 1;
 
-    const partRes = await fetch(
-      `${API_URL}/api/upload/part?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`,
-      { method: "POST", body: chunk, headers: { "x-admin-key": adminKey } }
-    );
+    let partData = null;
+    let partSuccess = false;
 
-    if (!partRes.ok) {
-      await fetch(`${API_URL}/api/upload/abort`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
-        body: JSON.stringify({ key, uploadId }),
-      }).catch(() => {});
-      throw new Error(`Failed to upload part ${partNumber}/${totalParts}`);
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const partRes = await fetch(
+          `${API_URL}/api/upload/part?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`,
+          { method: "POST", body: chunk, headers: { "x-admin-key": adminKey } }
+        );
+
+        if (!partRes.ok) {
+          // Server error — retry
+          if (partRes.status >= 500 && attempt < MAX_RETRIES) {
+            const delay = BASE_DELAY * Math.pow(2, attempt);
+            if (onRetry) onRetry(attempt + 1, delay, `Part ${partNumber}/${totalParts}: Server error ${partRes.status}`);
+            await sleep(delay);
+            continue;
+          }
+          throw new Error(`Part ${partNumber} upload failed: ${partRes.status}`);
+        }
+
+        partData = await partRes.json();
+        partSuccess = true;
+        break;
+      } catch (err) {
+        if (attempt < MAX_RETRIES && isNetworkError(err)) {
+          const delay = BASE_DELAY * Math.pow(2, attempt);
+          if (onRetry) onRetry(attempt + 1, delay, `Part ${partNumber}/${totalParts}: ${err.message || "Network error"}`);
+          await sleep(delay);
+          continue;
+        }
+        // Exhausted retries — abort the multipart upload
+        await fetchWithRetry(
+          `${API_URL}/api/upload/abort`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+            body: JSON.stringify({ key, uploadId }),
+          },
+          2,
+          onRetry
+        ).catch(() => {});
+        throw new Error(`Part ${partNumber}/${totalParts} failed after ${attempt + 1} attempts: ${err.message || "Network error"}`);
+      }
     }
 
-    const partData = await partRes.json();
+    if (!partSuccess || !partData) {
+      throw new Error(`Part ${partNumber}/${totalParts} failed to upload`);
+    }
+
     parts.push({ partNumber, etag: partData.etag });
     uploadedBytes += (end - start);
     if (onProgress) onProgress(uploadedBytes, file.size);
   }
 
-  const completeRes = await fetch(`${API_URL}/api/upload/complete`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
-    body: JSON.stringify({ key, uploadId, parts }),
-  });
+  // ── Complete (with retry) ──────────────────────────────────
+  const completeRes = await fetchWithRetry(
+    `${API_URL}/api/upload/complete`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+      body: JSON.stringify({ key, uploadId, parts }),
+    },
+    MAX_RETRIES,
+    onRetry
+  );
 
   if (!completeRes.ok) throw new Error("Failed to complete upload");
   const completeData = await completeRes.json();
   return completeData.publicUrl;
 }
 
-async function smartUpload(file, onProgress) {
+async function smartUpload(file, onProgress, onRetry) {
   if (file.size >= MULTIPART_THRESHOLD) {
-    return uploadMultipart(file, onProgress);
+    return uploadMultipart(file, onProgress, onRetry);
   } else {
-    return uploadSingle(file, onProgress);
+    return uploadSingle(file, onProgress, onRetry);
   }
 }
 
@@ -133,6 +241,7 @@ export default function R2Uploader({ onUpload }) {
   const [uploading, setUploading] = useState(false);
   const [category, setCategory] = useState("Nollywood");
   const [showChecklist, setShowChecklist] = useState(false);
+  const [retryInfo, setRetryInfo] = useState("");
 
   const [nfvcbNumber, setNfvcbNumber] = useState("");
   const [check1, setCheck1] = useState(false);
@@ -143,6 +252,10 @@ export default function R2Uploader({ onUpload }) {
   const isNollywood = category === "Nollywood";
   const allChecked = check1 && check2 && check3 && check4 && nfvcbNumber.trim().length > 0;
   const canUpload = isNollywood ? allChecked : true;
+
+  const handleRetry = (attempt, delay, reason) => {
+    setRetryInfo(`🔄 Network hiccup — retry ${attempt}/${MAX_RETRIES} in ${Math.round(delay / 1000)}s (${reason})`);
+  };
 
   const handleFile = async (e) => {
     const file = e.target.files[0];
@@ -158,6 +271,7 @@ export default function R2Uploader({ onUpload }) {
 
     setUploading(true);
     setProgress(1);
+    setRetryInfo("");
 
     try {
       let posterUrl = "";
@@ -170,30 +284,39 @@ export default function R2Uploader({ onUpload }) {
         posterUrl = await smartUpload(thumbFile, (uploaded, total) => {
           const percent = 5 + Math.round((uploaded / total) * 10);
           setProgress(percent);
-        });
+        }, handleRetry);
       } catch (err) {
         console.warn("Thumbnail generation failed:", err);
       }
 
+      setRetryInfo("");
+
       const publicUrl = await smartUpload(file, (uploaded, total) => {
         const percent = 15 + Math.round((uploaded / total) * 80);
         setProgress(percent);
-      });
+      }, handleRetry);
 
-      const saveRes = await fetch(`${API_URL}/movies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
-        body: JSON.stringify({
-          title: title,
-          description: desc,
-          category: category,
-          videoUrl: publicUrl,
-          posterUrl: posterUrl,
-          nfvcbNumber: isNollywood ? nfvcbNumber : "",
-          complianceChecks: isNollywood ? { check1, check2, check3, check4 } : null,
-          agreedAt: isNollywood ? new Date().toISOString() : null,
-        }),
-      });
+      setRetryInfo("");
+
+      const saveRes = await fetchWithRetry(
+        `${API_URL}/movies`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+          body: JSON.stringify({
+            title: title,
+            description: desc,
+            category: category,
+            videoUrl: publicUrl,
+            posterUrl: posterUrl,
+            nfvcbNumber: isNollywood ? nfvcbNumber : "",
+            complianceChecks: isNollywood ? { check1, check2, check3, check4 } : null,
+            agreedAt: isNollywood ? new Date().toISOString() : null,
+          }),
+        },
+        MAX_RETRIES,
+        handleRetry
+      );
 
       const saveData = await saveRes.json();
 
@@ -202,6 +325,7 @@ export default function R2Uploader({ onUpload }) {
       }
 
       setProgress(100);
+      setRetryInfo("");
       onUpload();
       alert("✅ Upload Complete! Movie is now pending approval.");
       setShowChecklist(false);
@@ -212,11 +336,12 @@ export default function R2Uploader({ onUpload }) {
       setCheck4(false);
     } catch (err) {
       console.error("Upload error:", err);
-      alert("❌ Upload failed: " + (err.message || "Unknown error"));
+      alert("❌ Upload failed after " + MAX_RETRIES + " retries: " + (err.message || "Unknown error"));
     }
 
     setProgress(0);
     setUploading(false);
+    setRetryInfo("");
     document.getElementById("title").value = "";
     document.getElementById("desc").value = "";
     e.target.value = "";
@@ -312,6 +437,12 @@ export default function R2Uploader({ onUpload }) {
             </div>
           )}
         </>
+      )}
+
+      {retryInfo && (
+        <div style={{ padding: "10px 12px", background: "rgba(255, 152, 0, 0.1)", border: "1px solid rgba(255, 152, 0, 0.3)", borderRadius: "6px", fontSize: "12px", color: "#ff9800", textAlign: "center" }}>
+          {retryInfo}
+        </div>
       )}
 
       <label style={{
