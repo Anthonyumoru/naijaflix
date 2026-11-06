@@ -405,9 +405,15 @@ function App() {
       alert(status.message || "Cannot chat with this user — one of you has blocked the other.");
       return;
     }
-    setPrivateChatUser(targetUser); setPrivateMessages([]); setPrivateInput(""); setShowPrivateChat(true); connectPrivateChat();
+    
+    setPrivateChatUser(targetUser); setPrivateMessages([]); setPrivateInput(""); setShowPrivateChat(true);
+    const room = getPrivateRoom(user.username, targetUser.username);
+    if (privateWsRef.current) { try { privateWsRef.current.close(); } catch (e) {} privateWsRef.current = null; }
+    if (privateHeartbeatRef.current) { clearInterval(privateHeartbeatRef.current); privateHeartbeatRef.current = null; }
+    privateShouldReconnectRef.current = true; privateReconnectAttemptsRef.current = 0;
+    
+    doConnectPrivate(room, targetUser.username);
   };
-
   const connectPrivateChat = () => {
     if (!user || !privateChatUser) return;
     const room = getPrivateRoom(user.username, privateChatUser.username);
