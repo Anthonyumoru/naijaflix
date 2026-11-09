@@ -715,6 +715,9 @@ function App() {
       const fetchMovies = async () => {
     setLoading(true); setLoadError(false);
     try {
+      const fetchMovies = async () => {
+    setLoading(true); setLoadError(false);
+    try {
       const res = await axios.get(`${API_URL}/movies?t=${Date.now()}`); const moviesData = Array.isArray(res.data) ? res.data : (res.data.movies || []); setMovies(moviesData);
       try { const likeRes = await axios.get(`${API_URL}/movies/likes`); if (likeRes.data && Array.isArray(likeRes.data)) setLikeCounts(Object.fromEntries(likeRes.data.map(l => [l.id, l.likes]))); }
       catch { moviesData.forEach(async (m) => { try { const likeRes = await axios.get(`${API_URL}/movies/${m.id}/likes`); setLikeCounts(prev => ({ ...prev, [m.id]: likeRes.data.likes })); } catch {} }); }
