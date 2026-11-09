@@ -712,14 +712,17 @@ function App() {
   const fetchMovies = async () => {
     setLoading(true); setLoadError(false);
     try {
-      const res = await axios.get(`${API_URL}/movies?t=${Date.now()}`); setMovies(res.data);
+      const fetchMovies = async () => {
+    setLoading(true); setLoadError(false);
+    try {
+      const res = await axios.get(`${API_URL}/movies?t=${Date.now()}`); const moviesData = Array.isArray(res.data) ? res.data : (res.data.movies || []); setMovies(moviesData);
       try { const likeRes = await axios.get(`${API_URL}/movies/likes`); if (likeRes.data && Array.isArray(likeRes.data)) setLikeCounts(Object.fromEntries(likeRes.data.map(l => [l.id, l.likes]))); }
-      catch { res.data.forEach(async (m) => { try { const likeRes = await axios.get(`${API_URL}/movies/${m.id}/likes`); setLikeCounts(prev => ({ ...prev, [m.id]: likeRes.data.likes })); } catch {} }); }
+      catch { moviesData.forEach(async (m) => { try { const likeRes = await axios.get(`${API_URL}/movies/${m.id}/likes`); setLikeCounts(prev => ({ ...prev, [m.id]: likeRes.data.likes })); } catch {} }); }
     } catch (err) { console.error("Failed to load movies:", err); setLoadError(true); }
     setLoading(false);
   };
 
-  const fetchRequests = async () => { try { const res = await axios.get(`${API_URL}/requests`); setRequests(res.data.filter(r => r.category !== "Report")); } catch (err) { console.error("Failed to load requests:", err); } };
+  const fetchRequests = async () => { try { const res = await axios.get(`${API_URL}/requests`); setRequests((Array.isArray(res.data) ? res.data : (res.data.requests || [])).filter(r => r.category !== "Report")); } catch (err) { console.error("Failed to load requests:", err); } };
   const fetchVerifiedCreators = async () => { try { const res = await fetch(`${TIPS_API}/creators/verified`); const data = await res.json(); if (data.verified) setVerifiedCreators(data.verified); } catch (err) { console.error("Failed to load verified creators:", err); } };
 
   useEffect(() => { fetchMovies(); fetchRequests(); fetchVerifiedCreators(); }, []);
