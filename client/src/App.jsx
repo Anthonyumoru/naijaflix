@@ -724,7 +724,6 @@ function App() {
     } catch (err) { console.error("Failed to load movies:", err); setLoadError(true); }
     setLoading(false);
   };
-
   const fetchRequests = async () => { try { const res = await axios.get(`${API_URL}/requests`); setRequests((Array.isArray(res.data) ? res.data : (res.data.requests || [])).filter(r => r.category !== "Report")); } catch (err) { console.error("Failed to load requests:", err); } };
   const fetchVerifiedCreators = async () => { try { const res = await fetch(`${TIPS_API}/creators/verified`); const data = await res.json(); if (data.verified) setVerifiedCreators(data.verified); } catch (err) { console.error("Failed to load verified creators:", err); } };
 
