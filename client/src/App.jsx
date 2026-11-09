@@ -349,10 +349,6 @@ function App() {
         else if (data.type === "message" || data.type === "voice") setChatMessages((prev) => { if (data.message && data.message.id && prev.some(m => m.id === data.message.id)) return prev; return [...prev, data.message]; });
         else if (data.type === "count") setOnlineCount(data.count);
         else if (data.type === "delete") setChatMessages((prev) => prev.filter((m) => m.id !== data.messageId));
-        else if (data.type === "blocked_list") setBlockedUsers((data.blocked || []).map(u => u.toLowerCase()));
-        else if (data.type === "block_success") setBlockedUsers(prev => [...prev, (data.blockedUser || "").toLowerCase()]);
-        else if (data.type === "unblock_success") setBlockedUsers(prev => prev.filter(u => u !== (data.blockedUser || "").toLowerCase()));
-        else if (data.type === "error") alert(`⚠️ ${data.message}`);
       } catch (e) {}
     };
     ws.onclose = () => {
@@ -400,38 +396,47 @@ function App() {
     if (!user) return alert("Please login to start a private chat");
     if (!targetUser || !targetUser.username) return;
     if (targetUser.username === user.username) return;
-    const status = await checkBlockStatus(targetUser.username);
-    if (status.anyBlocked) {
-      alert(status.message || "Cannot chat with this user — one of you has blocked the other.");
+
+    // Check block status before opening
+    const blockStatus = await checkBlockStatus(targetUser.username);
+    if (blockStatus.anyBlocked) {
+      if (blockStatus.aBlockedB) {
+        alert(`🚫 You blocked @${targetUser.username}. Unblock them first to chat.`);
+      } else {
+        alert(`🚫 @${targetUser.username} has blocked you.`);
+      }
       return;
     }
-    
-    setPrivateChatUser(targetUser); setPrivateMessages([]); setPrivateInput(""); setShowPrivateChat(true);
-    const room = getPrivateRoom(user.username, targetUser.username);
-    if (privateWsRef.current) { try { privateWsRef.current.close(); } catch (e) {} privateWsRef.current = null; }
-    if (privateHeartbeatRef.current) { clearInterval(privateHeartbeatRef.current); privateHeartbeatRef.current = null; }
-    privateShouldReconnectRef.current = true; privateReconnectAttemptsRef.current = 0;
-    
-    doConnectPrivate(room, targetUser.username);
+
+    setPrivateChatUser(targetUser);
+    setPrivateMessages([]);
+    setPrivateInput("");
+    setShowPrivateChat(true);
+    connectPrivateChat();
   };
+
   const connectPrivateChat = () => {
     if (!user || !privateChatUser) return;
     const room = getPrivateRoom(user.username, privateChatUser.username);
     if (privateWsRef.current) { try { privateWsRef.current.close(); } catch (e) {} privateWsRef.current = null; }
     if (privateHeartbeatRef.current) { clearInterval(privateHeartbeatRef.current); privateHeartbeatRef.current = null; }
-    privateShouldReconnectRef.current = true; privateReconnectAttemptsRef.current = 0;
-    doConnectPrivate(room, privateChatUser.username);
+    privateShouldReconnectRef.current = true; privateReconnectAttemptsRef.current = 0; doConnectPrivate(room);
   };
-  const doConnectPrivate = (room, targetUsername) => {
+
+  const doConnectPrivate = (room) => {
     if (!privateShouldReconnectRef.current) return;
     if (privateWsRef.current) { try { privateWsRef.current.close(); } catch (e) {} privateWsRef.current = null; }
     if (privateHeartbeatRef.current) { clearInterval(privateHeartbeatRef.current); privateHeartbeatRef.current = null; }
     const ws = new WebSocket(`${CHAT_WS}?room=${encodeURIComponent(room)}&user=${encodeURIComponent(user.username)}`);
     privateWsRef.current = ws;
     ws.onopen = () => {
-      privateReconnectAttemptsRef.current = 0; setPrivateConnected(true); privateLastReceivedRef.current = Date.now();
-      try { ws.send(JSON.stringify({ type: "private_join", username: user.username, avatar: profilePic || "", targetUser: targetUsername })); } catch (e) {}
-      try { ws.send(JSON.stringify({ type: "get_blocked", username: user.username })); } catch (e) {}
+      privateReconnectAttemptsRef.current = 0;
+      setPrivateConnected(true);
+      privateLastReceivedRef.current = Date.now();
+      try {
+        ws.send(JSON.stringify({ type: "private_join", username: user.username, avatar: profilePic || "", targetUser: privateChatUser.username }));
+        ws.send(JSON.stringify({ type: "get_blocked", username: user.username }));
+      } catch (e) {}
       privateHeartbeatRef.current = setInterval(() => {
         if (privateWsRef.current && privateWsRef.current.readyState === WebSocket.OPEN) {
           if (Date.now() - privateLastReceivedRef.current > 60000) { try { privateWsRef.current.close(); } catch (e) {} return; }
@@ -447,27 +452,30 @@ function App() {
         else if (data.type === "message" || data.type === "private_message" || data.type === "voice" || data.type === "private_voice")
           setPrivateMessages((prev) => { if (data.message && data.message.id && prev.some(m => m.id === data.message.id)) return prev; return [...prev, data.message]; });
         else if (data.type === "delete") setPrivateMessages((prev) => prev.filter((m) => m.id !== data.messageId));
-        else if (data.type === "private_join" && data.targetUser === user.username)
-          setPrivateMessages((prev) => [...prev, { id: `sys_${Date.now()}`, username: "system", text: `${data.username} joined the chat`, isSystem: true }]);
-        else if (data.type === "blocked_list") setBlockedUsers((data.blocked || []).map(u => u.toLowerCase()));
-        else if (data.type === "block_success") setBlockedUsers(prev => [...prev, (data.blockedUser || "").toLowerCase()]);
-        else if (data.type === "unblock_success") setBlockedUsers(prev => prev.filter(u => u !== (data.blockedUser || "").toLowerCase()));
-        else if (data.type === "blocked") { alert(data.message || "Cannot chat with this user."); closePrivateChat(); }
-        else if (data.type === "error") alert(`⚠️ ${data.message}`);
+        else if (data.type === "blocked_list") setBlockedUsers(data.blocked || []);
+        else if (data.type === "block_success") setBlockedUsers(prev => [...prev, data.blockedUser]);
+        else if (data.type === "unblock_success") setBlockedUsers(prev => prev.filter(u => u !== data.blockedUser));
+        else if (data.type === "blocked") {
+          alert(data.message || "You cannot chat with this user.");
+          closePrivateChat();
+        }
+        else if (data.type === "error") {
+          alert("⚠️ " + data.message);
+        }
       } catch (e) {}
     };
     ws.onclose = () => {
-      privateWsRef.current = null; setPrivateConnected(false);
+      privateWsRef.current = null;
+      setPrivateConnected(false);
       if (privateHeartbeatRef.current) { clearInterval(privateHeartbeatRef.current); privateHeartbeatRef.current = null; }
       if (privateShouldReconnectRef.current && privateReconnectAttemptsRef.current < 10) {
         const delay = Math.min(1000 * Math.pow(2, privateReconnectAttemptsRef.current), 30000);
         privateReconnectAttemptsRef.current++;
-        privateReconnectTimerRef.current = setTimeout(() => doConnectPrivate(room, targetUsername), delay);
+        privateReconnectTimerRef.current = setTimeout(() => doConnectPrivate(room), delay);
       }
     };
     ws.onerror = () => { setPrivateConnected(false); };
   };
-
   const sendPrivateMessage = () => {
     if (!privateInput.trim()) return;
     if (!user || !privateChatUser) return;
@@ -507,6 +515,7 @@ function App() {
     } catch (err) { alert("❌ Mic access denied: " + err.message); }
   };
 
+  // SEND AUDIO FILE (mp3, wav, ogg, m4a, etc.) IN PRIVATE CHAT
   const sendPrivateAudioFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -519,9 +528,15 @@ function App() {
     reader.onloadend = () => {
       if (privateWsRef.current && privateWsRef.current.readyState === WebSocket.OPEN) {
         privateWsRef.current.send(JSON.stringify({
-          type: "private_voice", username: user.username, avatar: profilePic || "",
-          audio: reader.result, duration: 0, mimeType: file.type || "audio/mpeg",
-          fileName: fileName, isFile: true, targetUser: privateChatUser.username
+          type: "private_voice",
+          username: user.username,
+          avatar: profilePic || "",
+          audio: reader.result,
+          duration: 0,
+          mimeType: file.type || "audio/mpeg",
+          fileName: fileName,
+          isFile: true,
+          targetUser: privateChatUser.username
         }));
       } else { alert("⚠️ Disconnected. Audio file not sent."); }
     };
@@ -538,26 +553,36 @@ function App() {
     setPrivateConnected(false);
   };
 
-  const closePrivateChat = () => { disconnectPrivateChat(); setShowPrivateChat(false); setPrivateChatUser(null); setPrivateMessages([]); setPrivateInput(""); };
+  const closePrivateChat = () => { disconnectPrivateChat(); setShowPrivateChat(false); setPrivateChatUser(null); setPrivateMessages([]); setPrivateInput(""); setShowBlockConfirm(false); };
 
-  // BLOCK / UNBLOCK / COPY FUNCTIONS
+  // BLOCK USER
   const blockUser = () => {
     if (!user || !privateChatUser) return;
     if (!privateWsRef.current || privateWsRef.current.readyState !== WebSocket.OPEN) return;
-    privateWsRef.current.send(JSON.stringify({ type: "block", username: user.username, blockedUser: privateChatUser.username }));
+    privateWsRef.current.send(JSON.stringify({
+      type: "block",
+      username: user.username,
+      blockedUser: privateChatUser.username
+    }));
     setBlockedUsers(prev => [...prev, privateChatUser.username.toLowerCase()]);
     setShowBlockConfirm(false);
     alert(`🚫 Blocked @${privateChatUser.username}`);
     closePrivateChat();
   };
 
+  // UNBLOCK USER
   const unblockUser = (targetUsername) => {
     if (!user || !privateWsRef.current || privateWsRef.current.readyState !== WebSocket.OPEN) return;
-    privateWsRef.current.send(JSON.stringify({ type: "unblock", username: user.username, blockedUser: targetUsername }));
+    privateWsRef.current.send(JSON.stringify({
+      type: "unblock",
+      username: user.username,
+      blockedUser: targetUsername
+    }));
     setBlockedUsers(prev => prev.filter(u => u !== targetUsername.toLowerCase()));
     alert(`✅ Unblocked @${targetUsername}`);
   };
 
+  // CHECK BLOCK STATUS before opening private chat
   const checkBlockStatus = async (targetUsername) => {
     if (!user) return { anyBlocked: false };
     try {
@@ -567,6 +592,7 @@ function App() {
     } catch { return { anyBlocked: false }; }
   };
 
+  // COPY MESSAGE
   const copyMessage = async (msg) => {
     const text = msg.text || (msg.isFile ? `📎 ${msg.fileName || 'Audio file'}` : '');
     if (!text) return;
@@ -632,6 +658,7 @@ function App() {
   const cancelVoiceNote = () => { cleanupRecording(); };
   const formatDuration = (seconds) => { const mins = Math.floor(seconds / 60); const secs = seconds % 60; return `${mins}:${secs.toString().padStart(2, "0")}`; };
 
+  // SEND AUDIO FILE IN GLOBAL CHAT
   const sendChatAudioFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -643,7 +670,16 @@ function App() {
     const reader = new FileReader();
     reader.onloadend = () => {
       if (chatWsRef.current && chatWsRef.current.readyState === WebSocket.OPEN) {
-        chatWsRef.current.send(JSON.stringify({ type: "voice", username: user.username, avatar: profilePic || "", audio: reader.result, duration: 0, mimeType: file.type || "audio/mpeg", fileName: fileName, isFile: true }));
+        chatWsRef.current.send(JSON.stringify({
+          type: "voice",
+          username: user.username,
+          avatar: profilePic || "",
+          audio: reader.result,
+          duration: 0,
+          mimeType: file.type || "audio/mpeg",
+          fileName: fileName,
+          isFile: true
+        }));
       } else { alert("⚠️ Disconnected. Audio file not sent."); }
     };
     reader.onerror = () => { alert("❌ Failed to read audio file."); };
@@ -670,7 +706,9 @@ function App() {
     if (!authUsername.trim() || !authPassword.trim()) return alert("Please enter username and password");
     if (!authEmail.trim()) return alert("Please enter your email address");
     try {
-      const payload = authMode === "login" ? { email: authEmail.trim(), username: authUsername, password: authPassword } : { username: authUsername, email: authEmail, password: authPassword };
+      const payload = authMode === "login"
+        ? { email: authEmail.trim(), username: authUsername, password: authPassword }
+        : { username: authUsername, email: authEmail, password: authPassword };
       const res = await fetch(`${AUTH_API}/${authMode === "login" ? "login" : "signup"}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (data.error) return alert("❌ " + data.error);
@@ -709,10 +747,7 @@ function App() {
   const saveAdminKey = () => { if (!adminKeyInput.trim()) return alert("Enter your admin key"); localStorage.setItem("adminKey", adminKeyInput); setAdminKey(adminKeyInput); setShowAdminSetup(false); setAdminKeyInput(""); alert("✅ Admin key saved!"); };
   const clearAdminKey = () => { localStorage.removeItem("adminKey"); setAdminKey(""); alert("Admin key removed."); };
 
-    const fetchMovies = async () => {
-    setLoading(true); setLoadError(false);
-    try {
-      const fetchMovies = async () => {
+  const fetchMovies = async () => {
     setLoading(true); setLoadError(false);
     try {
       const res = await axios.get(`${API_URL}/movies?t=${Date.now()}`); const moviesData = Array.isArray(res.data) ? res.data : (res.data.movies || []); setMovies(moviesData);
@@ -812,7 +847,6 @@ function App() {
 
   const isVerified = isVerifiedCreator || (creatorDashboard && (creatorDashboard.is_verified || (creatorDashboard.creator && creatorDashboard.creator.is_verified)));
   const openProfile = () => { setShowProfile(true); if (creatorId) fetchDashboard(creatorId); };
-
   return (
     <ErrorBoundary>
     <div className="home">
@@ -1131,10 +1165,7 @@ function App() {
                     <div onClick={() => openPrivateChat({ username: msg.username, avatar: "" })} title={`Chat privately with @${msg.username}`} style={{ width: "28px", height: "28px", borderRadius: "50%", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0, cursor: "pointer", border: msg.username === user?.username ? "2px solid var(--red)" : "2px solid transparent", transition: "transform 0.15s" }} onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.15)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}>👤</div>
                   )}
                   <div style={{ maxWidth: "220px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={{ fontSize: "11px", color: "#888" }}>@{msg.username}</span>
-                      <button onClick={() => copyMessage(msg)} style={{ fontSize: "10px", color: copiedMsgId === msg.id ? "#4CAF50" : "#888", background: "none", border: "none", cursor: "pointer", padding: "0" }}>{copiedMsgId === msg.id ? "✅ Copied" : "📋 Copy"}</button>
-                    </div>
+                    <span style={{ fontSize: "11px", color: "#888" }}>@{msg.username}</span>
                     {msg.isVoice && msg.audio ? (
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", borderRadius: "12px", background: msg.username === user?.username ? "var(--red)" : "var(--bg)", color: msg.username === user?.username ? "white" : "var(--text)" }}>
                         <button onClick={() => { const el = document.getElementById(`voice-${msg.id || i}`); if (el) { if (playingId === (msg.id || i)) { el.pause(); setPlayingId(null); } else { if (playingVoiceId.current) { const prev = document.getElementById(`voice-${playingVoiceId.current}`); if (prev) prev.pause(); } el.play(); setPlayingId(msg.id || i); playingVoiceId.current = msg.id || i; } } }} style={{ background: msg.username === user?.username ? "rgba(255,255,255,0.2)" : "var(--red)", color: "white", border: "none", borderRadius: "50%", width: "32px", height: "32px", cursor: "pointer", fontSize: "14px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{playingId === (msg.id || i) ? "⏸️" : "▶️"}</button>
@@ -1148,6 +1179,7 @@ function App() {
                       <p style={{ fontSize: "14px", padding: "8px 12px", borderRadius: "12px", background: msg.username === user?.username ? "var(--red)" : "var(--bg)", color: msg.username === user?.username ? "white" : "var(--text)", wordBreak: "break-word" }}>{msg.text}</p>
                     )}
                     {(msg.username === user?.username || adminKey) && msg.id && <button onClick={() => deleteChatMessage(msg.id)} style={{ background: "transparent", border: "none", color: "#f44336", cursor: "pointer", fontSize: "11px", padding: "2px 4px", marginTop: "2px" }}>🗑️ Delete</button>}
+                    {!msg.isVoice && <button onClick={() => copyMessage(msg)} style={{ background: "transparent", border: "none", color: copiedMsgId === msg.id ? "#4CAF50" : "#888", cursor: "pointer", fontSize: "11px", padding: "2px 4px", marginTop: "2px" }}>{copiedMsgId === msg.id ? "✅ Copied" : "📋 Copy"}</button>}
                   </div>
                 </div>
               ))
@@ -1182,12 +1214,8 @@ function App() {
                 <div style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: "7px", height: "7px", background: privateConnected ? "#4CAF50" : "#f44336", borderRadius: "50%" }} /><span style={{ fontSize: "11px", color: privateConnected ? "#4CAF50" : "#f44336" }}>{privateConnected ? "Connected" : "Connecting..."}</span></div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-              {blockedUsers.includes(privateChatUser.username.toLowerCase()) ? (
-                <button onClick={() => unblockUser(privateChatUser.username)} style={{ padding: "6px 12px", background: "#4CAF50", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>✅ Unblock</button>
-              ) : (
-                <button onClick={() => setShowBlockConfirm(true)} style={{ padding: "6px 12px", background: "#d32f2f", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>🚫 Block</button>
-              )}
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <button onClick={() => setShowBlockConfirm(true)} title="Block user" style={{ background: "transparent", border: "none", color: "#f44336", cursor: "pointer", fontSize: "16px", marginRight: "4px" }}>🚫</button>
               <button onClick={closePrivateChat} style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "18px" }}>✕</button>
             </div>
           </div>
@@ -1203,10 +1231,7 @@ function App() {
                     <>
                       {msg.avatar ? <img src={msg.avatar} alt="" style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink: 0 }}>👤</div>}
                       <div style={{ maxWidth: "220px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                          <span style={{ fontSize: "11px", color: "#888" }}>@{msg.username}</span>
-                          <button onClick={() => copyMessage(msg)} style={{ fontSize: "10px", color: copiedMsgId === msg.id ? "#4CAF50" : "#888", background: "none", border: "none", cursor: "pointer", padding: "0" }}>{copiedMsgId === msg.id ? "✅ Copied" : "📋 Copy"}</button>
-                        </div>
+                        <span style={{ fontSize: "11px", color: "#888" }}>@{msg.username}</span>
                         {msg.isVoice && msg.audio ? (
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", borderRadius: "12px", background: msg.username === user?.username ? "#1DA1F2" : "var(--bg)", color: msg.username === user?.username ? "white" : "var(--text)" }}>
                             <button onClick={() => { const el = document.getElementById(`pvoice-${msg.id || i}`); if (el) { if (playingId === `p${msg.id || i}`) { el.pause(); setPlayingId(null); } else { el.play(); setPlayingId(`p${msg.id || i}`); } } }} style={{ background: msg.username === user?.username ? "rgba(255,255,255,0.2)" : "#1DA1F2", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", cursor: "pointer", fontSize: "12px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{playingId === `p${msg.id || i}` ? "⏸️" : "▶️"}</button>
@@ -1218,6 +1243,11 @@ function App() {
                           </div>
                         ) : (
                           <p style={{ fontSize: "14px", padding: "8px 12px", borderRadius: "12px", background: msg.username === user?.username ? "#1DA1F2" : "var(--bg)", color: msg.username === user?.username ? "white" : "var(--text)", wordBreak: "break-word" }}>{msg.text}</p>
+                        )}
+                        {!msg.isVoice && !msg.isSystem && (
+                          <button onClick={() => copyMessage(msg)} style={{ background: "transparent", border: "none", color: copiedMsgId === msg.id ? "#4CAF50" : "#888", cursor: "pointer", fontSize: "11px", padding: "2px 4px", marginTop: "2px" }}>
+                            {copiedMsgId === msg.id ? "✅ Copied" : "📋 Copy"}
+                          </button>
                         )}
                       </div>
                     </>
@@ -1239,13 +1269,13 @@ function App() {
 
       {/* BLOCK CONFIRMATION MODAL */}
       {showBlockConfirm && privateChatUser && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10001 }} onClick={() => setShowBlockConfirm(false)}>
-          <div style={{ background: "var(--card)", borderRadius: "12px", padding: "24px", maxWidth: "350px", width: "90%", border: "1px solid var(--border)", textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginBottom: "12px" }}>🚫 Block @{privateChatUser.username}?</h2>
-            <p style={{ color: "#888", fontSize: "14px", marginBottom: "20px" }}>They won't be able to private chat with you. You can unblock them anytime.</p>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={() => setShowBlockConfirm(false)} style={{ flex: 1, padding: "12px", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>Cancel</button>
-              <button onClick={blockUser} style={{ flex: 1, padding: "12px", background: "#d32f2f", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>Block</button>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10001 }}>
+          <div style={{ background: "var(--card)", borderRadius: "12px", padding: "24px", maxWidth: "320px", width: "90%", border: "1px solid var(--border)", textAlign: "center" }}>
+            <h3 style={{ marginBottom: "12px" }}>🚫 Block @{privateChatUser.username}?</h3>
+            <p style={{ fontSize: "13px", color: "#888", marginBottom: "16px" }}>They won't be able to send you messages or open a private chat with you.</p>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button onClick={() => setShowBlockConfirm(false)} style={{ flex: 1, padding: "12px", background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "8px", cursor: "pointer" }}>Cancel</button>
+              <button onClick={blockUser} style={{ flex: 1, padding: "12px", background: "#f44336", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>Block</button>
             </div>
           </div>
         </div>
