@@ -5,10 +5,16 @@ const API_URL = import.meta.env.VITE_API_URL || "https://moviebox-backend.umorua
 const CHUNK_SIZE = 10 * 1024 * 1024;
 const MULTIPART_THRESHOLD = 100 * 1024 * 1024;
 const MAX_RETRIES = 5;
-const BASE_DELAY = 1000; // 1s, 2s, 4s, 8s, 16s
+const BASE_DELAY = 1000; // 1s
+const MAX_DELAY = 10000; // cap backoff at 10s
 
 // ── Sleep helper ──────────────────────────────────────────────
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ── Capped exponential backoff ───────────────────────────────
+function backoff(attempt) {
+  return Math.min(BASE_DELAY * Math.pow(2, attempt), MAX_DELAY);
+}
 
 // ── Check if error is network-related (retryable) ────────────
 function isNetworkError(err) {
@@ -30,19 +36,30 @@ function isNetworkError(err) {
   );
 }
 
-// ── Fetch with auto-retry on network errors ──────────────────
+// ── HTTP status codes worth retrying ─────────────────────────
+function isRetryableStatus(status) {
+  // 408 Request Timeout, 429 Too Many Requests, 5xx Server Errors
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+// ── Fetch with auto-retry on network errors & retryable status ─
 async function fetchWithRetry(url, options, retries = MAX_RETRIES, onRetry) {
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await fetch(url, options);
 
-      // If we get a 403/401, don't retry — it's an auth issue
+      // Auth errors — never retry
       if (res.status === 401 || res.status === 403) return res;
 
-      // 5xx server errors are also retryable
-      if (res.status >= 500 && attempt < retries) {
-        const delay = BASE_DELAY * Math.pow(2, attempt);
+      // Retryable HTTP status (408, 429, 5xx)
+      if (isRetryableStatus(res.status) && attempt < retries) {
+        let delay = backoff(attempt);
+        const retryAfter = res.headers.get("Retry-After");
+        if (retryAfter) {
+          const secs = parseInt(retryAfter, 10);
+          if (!isNaN(secs)) delay = Math.min(secs * 1000, MAX_DELAY * 3);
+        }
         if (onRetry) onRetry(attempt + 1, delay, `Server error ${res.status}`);
         await sleep(delay);
         continue;
@@ -52,7 +69,7 @@ async function fetchWithRetry(url, options, retries = MAX_RETRIES, onRetry) {
     } catch (err) {
       lastErr = err;
       if (attempt < retries && isNetworkError(err)) {
-        const delay = BASE_DELAY * Math.pow(2, attempt);
+        const delay = backoff(attempt);
         if (onRetry) onRetry(attempt + 1, delay, err.message || "Network error");
         await sleep(delay);
         continue;
@@ -60,9 +77,28 @@ async function fetchWithRetry(url, options, retries = MAX_RETRIES, onRetry) {
       throw err;
     }
   }
-  throw lastErr;
+  throw lastErr || new Error("fetchWithRetry exhausted with no error captured");
 }
 
+// ── Abort a multipart upload (best-effort) ────────────────────
+async function abortMultipart(key, uploadId, adminKey, onRetry) {
+  try {
+    await fetchWithRetry(
+      `${API_URL}/api/upload/abort`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ key, uploadId }),
+      },
+      2,
+      onRetry
+    );
+  } catch (e) {
+    console.warn("Multipart abort failed (orphan possible):", e.message);
+  }
+}
+
+// ── Generate a thumbnail from a video file ───────────────────
 async function generateThumbnail(file) {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
@@ -101,6 +137,7 @@ async function generateThumbnail(file) {
   });
 }
 
+// ── Single (non-multipart) upload ────────────────────────────
 async function uploadSingle(file, onProgress, onRetry) {
   const adminKey = localStorage.getItem("adminKey") || "";
   const filename = encodeURIComponent(file.name);
@@ -123,10 +160,11 @@ async function uploadSingle(file, onProgress, onRetry) {
   return data.publicUrl;
 }
 
+// ── Multipart upload (unified retry via fetchWithRetry) ──────
 async function uploadMultipart(file, onProgress, onRetry) {
   const adminKey = localStorage.getItem("adminKey") || "";
 
-  // ── Initiate (with retry) ──────────────────────────────────
+  // ── Initiate ───────────────────────────────────────────────
   const initRes = await fetchWithRetry(
     `${API_URL}/api/upload/initiate`,
     {
@@ -148,85 +186,54 @@ async function uploadMultipart(file, onProgress, onRetry) {
   const parts = [];
   let uploadedBytes = 0;
 
-  // ── Upload each part with per-part retry ──────────────────
-  for (let i = 0; i < totalParts; i++) {
-    const start = i * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
-    const partNumber = i + 1;
+  try {
+    // ── Upload each part via fetchWithRetry ─────────────────
+    for (let i = 0; i < totalParts; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
+      const partNumber = i + 1;
 
-    let partData = null;
-    let partSuccess = false;
+      const partRes = await fetchWithRetry(
+        `${API_URL}/api/upload/part?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`,
+        { method: "POST", body: chunk, headers: { "x-admin-key": adminKey } },
+        MAX_RETRIES,
+        (a, d, r) => onRetry && onRetry(a, d, `Part ${partNumber}/${totalParts}: ${r}`)
+      );
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const partRes = await fetch(
-          `${API_URL}/api/upload/part?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`,
-          { method: "POST", body: chunk, headers: { "x-admin-key": adminKey } }
-        );
-
-        if (!partRes.ok) {
-          // Server error — retry
-          if (partRes.status >= 500 && attempt < MAX_RETRIES) {
-            const delay = BASE_DELAY * Math.pow(2, attempt);
-            if (onRetry) onRetry(attempt + 1, delay, `Part ${partNumber}/${totalParts}: Server error ${partRes.status}`);
-            await sleep(delay);
-            continue;
-          }
-          throw new Error(`Part ${partNumber} upload failed: ${partRes.status}`);
-        }
-
-        partData = await partRes.json();
-        partSuccess = true;
-        break;
-      } catch (err) {
-        if (attempt < MAX_RETRIES && isNetworkError(err)) {
-          const delay = BASE_DELAY * Math.pow(2, attempt);
-          if (onRetry) onRetry(attempt + 1, delay, `Part ${partNumber}/${totalParts}: ${err.message || "Network error"}`);
-          await sleep(delay);
-          continue;
-        }
-        // Exhausted retries — abort the multipart upload
-        await fetchWithRetry(
-          `${API_URL}/api/upload/abort`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
-            body: JSON.stringify({ key, uploadId }),
-          },
-          2,
-          onRetry
-        ).catch(() => {});
-        throw new Error(`Part ${partNumber}/${totalParts} failed after ${attempt + 1} attempts: ${err.message || "Network error"}`);
+      if (!partRes.ok) {
+        throw new Error(`Part ${partNumber}/${totalParts} upload failed: ${partRes.status}`);
       }
+
+      const partData = await partRes.json();
+      parts.push({ partNumber, etag: partData.etag });
+      uploadedBytes += (end - start);
+      if (onProgress) onProgress(uploadedBytes, file.size);
     }
 
-    if (!partSuccess || !partData) {
-      throw new Error(`Part ${partNumber}/${totalParts} failed to upload`);
-    }
+    // ── Complete ────────────────────────────────────────────
+    const completeRes = await fetchWithRetry(
+      `${API_URL}/api/upload/complete`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        body: JSON.stringify({ key, uploadId, parts }),
+      },
+      MAX_RETRIES,
+      onRetry
+    );
 
-    parts.push({ partNumber, etag: partData.etag });
-    uploadedBytes += (end - start);
-    if (onProgress) onProgress(uploadedBytes, file.size);
+    if (!completeRes.ok) throw new Error("Failed to complete upload");
+    const completeData = await completeRes.json();
+    return completeData.publicUrl;
+  } catch (err) {
+    // Any failure during part upload or completion → abort & rethrow
+    await abortMultipart(key, uploadId, adminKey, onRetry);
+    throw err;
   }
-
-  // ── Complete (with retry) ──────────────────────────────────
-  const completeRes = await fetchWithRetry(
-    `${API_URL}/api/upload/complete`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
-      body: JSON.stringify({ key, uploadId, parts }),
-    },
-    MAX_RETRIES,
-    onRetry
-  );
-
-  if (!completeRes.ok) throw new Error("Failed to complete upload");
-  const completeData = await completeRes.json();
-  return completeData.publicUrl;
 }
 
+// ── Choose upload strategy by file size ──────────────────────
 async function smartUpload(file, onProgress, onRetry) {
   if (file.size >= MULTIPART_THRESHOLD) {
     return uploadMultipart(file, onProgress, onRetry);
@@ -241,6 +248,7 @@ export default function R2Uploader({ onUpload }) {
   const [category, setCategory] = useState("Nollywood");
   const [showChecklist, setShowChecklist] = useState(false);
   const [retryInfo, setRetryInfo] = useState("");
+  const [thumbWarning, setThumbWarning] = useState("");
 
   const [nfvcbNumber, setNfvcbNumber] = useState("");
   const [check1, setCheck1] = useState(false);
@@ -271,6 +279,7 @@ export default function R2Uploader({ onUpload }) {
     setUploading(true);
     setProgress(1);
     setRetryInfo("");
+    setThumbWarning("");
 
     try {
       let posterUrl = "";
@@ -286,6 +295,7 @@ export default function R2Uploader({ onUpload }) {
         }, handleRetry);
       } catch (err) {
         console.warn("Thumbnail generation failed:", err);
+        setThumbWarning("⚠️ Thumbnail could not be generated — movie will have no poster image.");
       }
 
       setRetryInfo("");
@@ -341,6 +351,7 @@ export default function R2Uploader({ onUpload }) {
     setProgress(0);
     setUploading(false);
     setRetryInfo("");
+    setThumbWarning("");
     document.getElementById("title").value = "";
     document.getElementById("desc").value = "";
     e.target.value = "";
@@ -436,6 +447,12 @@ export default function R2Uploader({ onUpload }) {
             </div>
           )}
         </>
+      )}
+
+      {thumbWarning && (
+        <div style={{ padding: "10px 12px", background: "rgba(255, 152, 0, 0.1)", border: "1px solid rgba(255, 152, 0, 0.3)", borderRadius: "6px", fontSize: "12px", color: "#ff9800", textAlign: "center" }}>
+          {thumbWarning}
+        </div>
       )}
 
       {retryInfo && (
