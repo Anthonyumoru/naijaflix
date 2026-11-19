@@ -246,17 +246,15 @@ function App() {
     if (selectedMovie) { requestAnimationFrame(() => { const ins = document.querySelector('ins.adsbygoogle'); if (ins) { try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {} } }); }
   }, [selectedMovie]);
 
-  // Monetag ad — only loads when a video is opened
+  // Monetag — load the SDK once, when a video is opened
   useEffect(() => {
     if (!selectedMovie) return;
-    const container = document.getElementById("monetag-ad");
-    if (!container) return;
-    container.innerHTML = "";
-    const script = document.createElement("script");
-    script.src = "https://uplcm.com/4/12299575";
-    script.async = true;
-    container.appendChild(script);
-    return () => { if (container) container.innerHTML = ""; };
+    if (document.querySelector('script[src*="nap5k.com/tag.min.js"]')) return;
+    const s = document.createElement("script");
+    s.dataset.zone = "12302825";
+    s.src = "https://nap5k.com/tag.min.js";
+    s.async = true;
+    document.body.appendChild(s);
   }, [selectedMovie]);
 
   useEffect(() => { if (webcamVideoRef.current && webcamStreamRef.current) webcamVideoRef.current.srcObject = webcamStreamRef.current; }, [webcamReady]);
@@ -1082,7 +1080,6 @@ function App() {
             {verifiedCreators[selectedMovie.creator_id] && <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", background: "var(--bg)", borderRadius: "8px", border: "1px solid var(--border)" }}><VerifiedBadge size={16} /><span style={{ fontSize: "14px", fontWeight: "600", color: "#1DA1F2" }}>{verifiedCreators[selectedMovie.creator_id]}</span><span style={{ fontSize: "12px", color: "#888" }}>· Verified Creator</span></div>}
             <p style={{ marginTop: "8px", fontSize: "14px", color: "#888" }}>{selectedMovie.description}</p>
             <ins className="adsbygoogle" style={{ display: "block", textAlign: "center", marginTop: "12px" }} data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-9990443784312840" data-ad-slot="4823007211"></ins>
-            <a href="https://uplcm.com/4/12299575" target="_blank" rel="noopener noreferrer sponsored" style={{ display: "block", marginTop: "12px", padding: "12px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", color: "var(--text)", textAlign: "center", textDecoration: "none", fontSize: "13px" }}>Sponsored — tap to support NaijaFlix</a>
             {showTip && (
               <div style={{ marginTop: "16px", background: "var(--card)", borderRadius: "8px", padding: "16px", border: "1px solid var(--border)" }}>
                 <h3 style={{ marginBottom: "12px" }}>💰 Tip the Creator</h3>
