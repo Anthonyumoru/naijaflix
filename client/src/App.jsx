@@ -1062,7 +1062,7 @@ function App() {
       </div>
 
             {selectedMovie && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", zIndex: 9999, padding: "16px", overflowY: "auto" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }}>
           <button onClick={() => { setSelectedMovie(null); setShowComments(null); setShowTip(false); }} style={{ position: "absolute", top: "16px", right: "16px", background: "var(--red)", color: "white", border: "none", borderRadius: "50%", width: "40px", height: "40px", fontSize: "20px", cursor: "pointer" }}>✕</button>
           <div style={{ maxWidth: "800px", width: "100%" }}>
             <video src={`${STREAM_URL}${encodeURIComponent(selectedMovie.videoUrl)}`} poster={selectedMovie.posterUrl} controls autoPlay style={{ width: "100%", maxHeight: "60vh", borderRadius: "8px", background: "#000" }} onPlay={() => trackView(selectedMovie.id)} onTimeUpdate={(e) => handleTimeUpdate(e, selectedMovie)} />
