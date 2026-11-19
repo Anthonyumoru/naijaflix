@@ -875,7 +875,7 @@ function App() {
               <button className="theme-toggle" onClick={handleLogout} style={{ fontSize: "14px" }}>🚪 Logout</button>
             </>
           ) : <button className="theme-toggle" onClick={() => { setAuthMode("login"); setShowAuth(true); }} style={{ fontSize: "14px" }}>🔑 Login</button>}
-          <button className="theme-toggle" onClick={() => setShowCreatorDashboard(!showCreatorDashboard); if (creatorId) fetchDashboard(creatorId); }} style={{ fontSize: "16px" }}>💰 Creator</button>
+          <button className="theme-toggle" onClick={() => { setShowCreatorDashboard(!showCreatorDashboard); if (creatorId) fetchDashboard(creatorId); }} style={{ fontSize: "16px" }}>💰 Creator</button>
           <button className="theme-toggle" onClick={() => setShowAdminSetup(true)} style={{ fontSize: "16px" }}>⚙️</button>
           <button className="theme-toggle" onClick={() => setShowLive(true)} style={{ fontSize: "16px", color: isLive ? "#e50914" : undefined }}>🔴 Live</button>
           <button className="theme-toggle" onClick={() => { if (!showChat) { setShowChat(true); connectChat(); } else { setShowChat(false); disconnectChat(); } }} style={{ fontSize: "16px" }}>💬 Chat</button>
