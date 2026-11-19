@@ -1063,7 +1063,7 @@ function App() {
         )}
       </div>
 
-      {selectedMovie && (
+            {selectedMovie && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }}>
           <button onClick={() => { setSelectedMovie(null); setShowComments(null); setShowTip(false); }} style={{ position: "absolute", top: "16px", right: "16px", background: "var(--red)", color: "white", border: "none", borderRadius: "50%", width: "40px", height: "40px", fontSize: "20px", cursor: "pointer" }}>✕</button>
           <div style={{ maxWidth: "800px", width: "100%" }}>
@@ -1082,7 +1082,7 @@ function App() {
             {verifiedCreators[selectedMovie.creator_id] && <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", background: "var(--bg)", borderRadius: "8px", border: "1px solid var(--border)" }}><VerifiedBadge size={16} /><span style={{ fontSize: "14px", fontWeight: "600", color: "#1DA1F2" }}>{verifiedCreators[selectedMovie.creator_id]}</span><span style={{ fontSize: "12px", color: "#888" }}>· Verified Creator</span></div>}
             <p style={{ marginTop: "8px", fontSize: "14px", color: "#888" }}>{selectedMovie.description}</p>
             <ins className="adsbygoogle" style={{ display: "block", textAlign: "center", marginTop: "12px" }} data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-9990443784312840" data-ad-slot="4823007211"></ins>
-            <div id="monetag-ad" style={{ marginTop: "12px", minHeight: "100px", display: "flex", justifyContent: "center" }}></div>
+            <a href="https://uplcm.com/4/12299575" target="_blank" rel="noopener noreferrer sponsored" style={{ display: "block", marginTop: "12px", padding: "12px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", color: "var(--text)", textAlign: "center", textDecoration: "none", fontSize: "13px" }}>Sponsored — tap to support NaijaFlix</a>
             {showTip && (
               <div style={{ marginTop: "16px", background: "var(--card)", borderRadius: "8px", padding: "16px", border: "1px solid var(--border)" }}>
                 <h3 style={{ marginBottom: "12px" }}>💰 Tip the Creator</h3>
