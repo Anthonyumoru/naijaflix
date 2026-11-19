@@ -246,6 +246,19 @@ function App() {
     if (selectedMovie) { requestAnimationFrame(() => { const ins = document.querySelector('ins.adsbygoogle'); if (ins) { try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {} } }); }
   }, [selectedMovie]);
 
+  // Monetag ad — only loads when a video is opened
+  useEffect(() => {
+    if (!selectedMovie) return;
+    const container = document.getElementById("monetag-ad");
+    if (!container) return;
+    container.innerHTML = "";
+    const script = document.createElement("script");
+    script.src = "https://uplcm.com/4/12299575";
+    script.async = true;
+    container.appendChild(script);
+    return () => { if (container) container.innerHTML = ""; };
+  }, [selectedMovie]);
+
   useEffect(() => { if (webcamVideoRef.current && webcamStreamRef.current) webcamVideoRef.current.srcObject = webcamStreamRef.current; }, [webcamReady]);
 
   const cleanupWebcam = () => {
@@ -862,7 +875,7 @@ function App() {
               <button className="theme-toggle" onClick={handleLogout} style={{ fontSize: "14px" }}>🚪 Logout</button>
             </>
           ) : <button className="theme-toggle" onClick={() => { setAuthMode("login"); setShowAuth(true); }} style={{ fontSize: "14px" }}>🔑 Login</button>}
-          <button className="theme-toggle" onClick={() => { setShowCreatorDashboard(!showCreatorDashboard); if (creatorId) fetchDashboard(creatorId); }} style={{ fontSize: "16px" }}>💰 Creator</button>
+          <button className="theme-toggle" onClick={() => setShowCreatorDashboard(!showCreatorDashboard); if (creatorId) fetchDashboard(creatorId); }} style={{ fontSize: "16px" }}>💰 Creator</button>
           <button className="theme-toggle" onClick={() => setShowAdminSetup(true)} style={{ fontSize: "16px" }}>⚙️</button>
           <button className="theme-toggle" onClick={() => setShowLive(true)} style={{ fontSize: "16px", color: isLive ? "#e50914" : undefined }}>🔴 Live</button>
           <button className="theme-toggle" onClick={() => { if (!showChat) { setShowChat(true); connectChat(); } else { setShowChat(false); disconnectChat(); } }} style={{ fontSize: "16px" }}>💬 Chat</button>
@@ -1069,6 +1082,7 @@ function App() {
             {verifiedCreators[selectedMovie.creator_id] && <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", background: "var(--bg)", borderRadius: "8px", border: "1px solid var(--border)" }}><VerifiedBadge size={16} /><span style={{ fontSize: "14px", fontWeight: "600", color: "#1DA1F2" }}>{verifiedCreators[selectedMovie.creator_id]}</span><span style={{ fontSize: "12px", color: "#888" }}>· Verified Creator</span></div>}
             <p style={{ marginTop: "8px", fontSize: "14px", color: "#888" }}>{selectedMovie.description}</p>
             <ins className="adsbygoogle" style={{ display: "block", textAlign: "center", marginTop: "12px" }} data-ad-layout="in-article" data-ad-format="fluid" data-ad-client="ca-pub-9990443784312840" data-ad-slot="4823007211"></ins>
+            <div id="monetag-ad" style={{ marginTop: "12px", minHeight: "100px", display: "flex", justifyContent: "center" }}></div>
             {showTip && (
               <div style={{ marginTop: "16px", background: "var(--card)", borderRadius: "8px", padding: "16px", border: "1px solid var(--border)" }}>
                 <h3 style={{ marginBottom: "12px" }}>💰 Tip the Creator</h3>
@@ -1242,7 +1256,8 @@ function App() {
                             <audio id={`pvoice-${msg.id || i}`} src={msg.audio} preload="none" onEnded={() => setPlayingId(null)} style={{ display: "none" }} />
                           </div>
                         ) : (
-                          <p style={{ fontSize: "14px", padding: "8px 12px", borderRadius: "12px", background: msg.username === user?.username ? "#1DA1F2" : "var(--bg)", color: msg.username === user?.username ? "white" : "var(--text)", wordBreak: "break-word" }}>{msg.text}</p>
+                          <p style={{ fontSize: "14px", padding: "8px 12px",
+borderRadius: "12px", background: msg.username === user?.username ? "#1DA1F2" : "var(--bg)", color: msg.username === user?.username ? "white" : "var(--text)", wordBreak: "break-word" }}>{msg.text}</p>
                         )}
                         {!msg.isVoice && !msg.isSystem && (
                           <button onClick={() => copyMessage(msg)} style={{ background: "transparent", border: "none", color: copiedMsgId === msg.id ? "#4CAF50" : "#888", cursor: "pointer", fontSize: "11px", padding: "2px 4px", marginTop: "2px" }}>
