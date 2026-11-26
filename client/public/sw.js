@@ -1,4 +1,4 @@
-const CACHE_NAME = "naijaflix-v2";
+const CACHE_NAME = "naijaflix-v3";
 const ASSETS = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 const DB_NAME = "naijaflix-encrypted";
 const DB_VERSION = 1;
@@ -255,6 +255,29 @@ self.addEventListener("fetch", (e) => {
     );
     return;
   }
+
+  // Network-first for HTML navigation (always get the latest shell when online)
+  const isNavigation =
+    request.mode === "navigate" ||
+    request.url.endsWith("/index.html") ||
+    request.url === self.location.origin + "/";
+
+  if (isNavigation) {
+    e.respondWith(
+      fetch(request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          return response;
+        })
+        .catch(() =>
+          caches.match(request).then((c) => c || caches.match("/index.html"))
+        )
+    );
+    return;
+  }
+
+  // Cache-first for static assets (JS, CSS, images = fast)
   e.respondWith(
     caches.match(request).then((cached) => {
       return (
