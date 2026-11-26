@@ -52,10 +52,34 @@
 
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
-    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+
+    <!-- Cast sender — deferred so it does NOT block rendering -->
+    <script defer src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+
+    <!-- Instant loading skeleton so users see something immediately -->
+    <style>
+      #boot-splash {
+        position: fixed; inset: 0; background: #0a0a0a;
+        display: flex; align-items: center; justify-content: center;
+        flex-direction: column; gap: 16px; z-index: 9999;
+      }
+      #boot-splash .logo { font-size: 56px; }
+      #boot-splash .name { color: #e50914; font-size: 28px; font-weight: 800; font-family: -apple-system, sans-serif; }
+      #boot-splash .spinner {
+        width: 32px; height: 32px; border: 3px solid #222;
+        border-top-color: #e50914; border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-splash">
+      <div class="logo">🎬</div>
+      <div class="name">NaijaFlix</div>
+      <div class="spinner"></div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
